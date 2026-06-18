@@ -1,0 +1,68 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fl-acestep-training-plus"
+version = "1.3.1+mem.1"
+description = "FL AceStep Training PLUS - LoRA Training nodes for ACE-Step 1.5 in ComfyUI, forked to add VRAM/CPU-RAM memory controls (optimizer selection incl. CPU-paged 8-bit, gradient checkpointing, periodic cache clearing). See FORK_NOTES.md."
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+keywords = ["comfyui", "ace-step", "music-generation", "lora", "training"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Multimedia :: Sound/Audio",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "torch>=2.0.0",
+    "torchaudio>=2.0.0",
+    "transformers>=4.40.0",
+    "diffusers>=0.28.0",
+    "peft>=0.10.0",
+    "lightning>=2.0.0",
+    "accelerate>=0.30.0",
+    "huggingface-hub>=0.20.0",
+    "loguru>=0.7.0",
+    "soundfile>=0.12.0",
+    "safetensors>=0.4.0",
+]
+
+[project.urls]
+# Fork of github.com/filliptm/ComfyUI-FL-AceStep-Training (see FORK_NOTES.md).
+Repository = "https://github.com/algotuna/ComfyUI-FL-AceStep-Training-PLUS"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "black>=23.0.0",
+    "isort>=5.12.0",
+]
+vllm = [
+    "vllm>=0.4.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["nodes*", "modules*"]
+
+[tool.black]
+line-length = 100
+target-version = ["py310", "py311"]
+
+[tool.isort]
+profile = "black"
+line_length = 100
+
+[tool.comfy]
+# Fork published under algotuna's handle (distinct from the upstream author).
+PublisherId = "algotuna"
+DisplayName = "FL AceStep Training PLUS"
+Icon = ""

@@ -1,0 +1,517 @@
+{
+  "id": "9b248ee0-9e2f-4373-98c3-1e9385750f11",
+  "revision": 0,
+  "last_node_id": 8,
+  "last_link_id": 11,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "FL_AceStep_LabelSamples",
+      "pos": [
+        -1590.878227169258,
+        -594.3248512775579
+      ],
+      "size": [
+        313.6119140625,
+        190
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "dataset",
+          "type": "ACESTEP_DATASET",
+          "link": 1
+        },
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 2
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 3
+        },
+        {
+          "name": "llm",
+          "type": "ACESTEP_LLM",
+          "link": 4
+        }
+      ],
+      "outputs": [
+        {
+          "name": "dataset",
+          "type": "ACESTEP_DATASET",
+          "links": [
+            6
+          ]
+        },
+        {
+          "name": "labeled_count",
+          "type": "INT",
+          "links": []
+        },
+        {
+          "name": "status",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "cnr_id": "fl-acestep-training",
+        "ver": "49740cb896c1c169364c15f7cd821fe813883604",
+        "Node name for S&R": "FL_AceStep_LabelSamples"
+      },
+      "widgets_values": [
+        false,
+        false,
+        true,
+        true
+      ],
+      "color": "#16727c",
+      "bgcolor": "#4F0074"
+    },
+    {
+      "id": 4,
+      "type": "FL_AceStep_LLMLoader",
+      "pos": [
+        -1572.8964896581688,
+        -785.6811381922724
+      ],
+      "size": [
+        270,
+        130
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "llm",
+          "type": "ACESTEP_LLM",
+          "links": [
+            4
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "fl-acestep-training",
+        "ver": "49740cb896c1c169364c15f7cd821fe813883604",
+        "Node name for S&R": "FL_AceStep_LLMLoader"
+      },
+      "widgets_values": [
+        "acestep-5Hz-lm-1.7B",
+        "auto",
+        "pt",
+        ""
+      ],
+      "color": "#16727c",
+      "bgcolor": "#4F0074"
+    },
+    {
+      "id": 6,
+      "type": "FL_AceStep_ScanDirectory",
+      "pos": [
+        -1952.0303345837438,
+        -595.5688709581174
+      ],
+      "size": [
+        320.2427734375,
+        170
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "dataset",
+          "type": "ACESTEP_DATASET",
+          "links": [
+            1
+          ]
+        },
+        {
+          "name": "sample_count",
+          "type": "INT",
+          "links": null
+        },
+        {
+          "name": "status",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "fl-acestep-training",
+        "ver": "49740cb896c1c169364c15f7cd821fe813883604",
+        "Node name for S&R": "FL_AceStep_ScanDirectory"
+      },
+      "widgets_values": [
+        "",
+        false,
+        "Future",
+        "prepend"
+      ],
+      "color": "#16727c",
+      "bgcolor": "#4F0074"
+    },
+    {
+      "id": 5,
+      "type": "FL_AceStep_PreprocessDataset",
+      "pos": [
+        -1238.7983675751118,
+        -594.5178070200783
+      ],
+      "size": [
+        309.5650390625,
+        166
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "dataset",
+          "type": "ACESTEP_DATASET",
+          "link": 6
+        },
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 7
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 8
+        },
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 9
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output_path",
+          "type": "STRING",
+          "links": []
+        },
+        {
+          "name": "sample_count",
+          "type": "INT",
+          "links": null
+        },
+        {
+          "name": "status",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "fl-acestep-training",
+        "ver": "e867dfc409c8211cb7b95c41e98c32ac6deff7b9",
+        "Node name for S&R": "FL_AceStep_PreprocessDataset"
+      },
+      "widgets_values": [
+        "./output/acestep/datasets",
+        240,
+        0
+      ],
+      "color": "#16727c",
+      "bgcolor": "#4F0074"
+    },
+    {
+      "id": 8,
+      "type": "FL_AceStep_Train",
+      "pos": [
+        -1024.8923264166501,
+        -312.67826324932935
+      ],
+      "size": [
+        773.7998442290091,
+        654.2143446077278
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 4,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 10
+        },
+        {
+          "name": "config",
+          "type": "ACESTEP_TRAINING_CONFIG",
+          "link": 11
+        }
+      ],
+      "outputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "links": null
+        },
+        {
+          "name": "final_lora_path",
+          "type": "STRING",
+          "links": null
+        },
+        {
+          "name": "status",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "cnr_id": "fl-acestep-training",
+        "ver": "49740cb896c1c169364c15f7cd821fe813883604",
+        "Node name for S&R": "FL_AceStep_Train"
+      },
+      "widgets_values": [
+        "./output/acestep/datasets",
+        "",
+        "",
+        ""
+      ],
+      "color": "#16727c",
+      "bgcolor": "#4F0074"
+    },
+    {
+      "id": 7,
+      "type": "FL_AceStep_TrainingConfig",
+      "pos": [
+        -1394.7152152700087,
+        -296.6407442971491
+      ],
+      "size": [
+        327.2564453125,
+        394
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 4,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "config",
+          "type": "ACESTEP_TRAINING_CONFIG",
+          "links": [
+            11
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "fl-acestep-training",
+        "ver": "27d70c722e9be51a08825564e6d6741d011eac83",
+        "Node name for S&R": "FL_AceStep_TrainingConfig"
+      },
+      "widgets_values": [
+        64,
+        128,
+        0.1,
+        0.0003,
+        500,
+        1,
+        1,
+        100,
+        "./output/acestep/loras",
+        42,
+        "fixed",
+        100,
+        0.01,
+        1,
+        "q_proj,k_proj,v_proj,o_proj"
+      ],
+      "color": "#16727c",
+      "bgcolor": "#4F0074"
+    },
+    {
+      "id": 2,
+      "type": "CheckpointLoaderSimple",
+      "pos": [
+        -2325.918780850313,
+        -308.83790407948993
+      ],
+      "size": [
+        361.2281099076804,
+        98
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            2,
+            7,
+            10
+          ]
+        },
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            9
+          ]
+        },
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": [
+            3,
+            8
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.12.1",
+        "Node name for S&R": "CheckpointLoaderSimple",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "7.5.2",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        "ace_step_1.5_turbo_aio.safetensors"
+      ]
+    }
+  ],
+  "links": [
+    [
+      1,
+      6,
+      0,
+      1,
+      0,
+      "ACESTEP_DATASET"
+    ],
+    [
+      2,
+      2,
+      0,
+      1,
+      1,
+      "MODEL"
+    ],
+    [
+      3,
+      2,
+      2,
+      1,
+      2,
+      "VAE"
+    ],
+    [
+      4,
+      4,
+      0,
+      1,
+      3,
+      "ACESTEP_LLM"
+    ],
+    [
+      6,
+      1,
+      0,
+      5,
+      0,
+      "ACESTEP_DATASET"
+    ],
+    [
+      7,
+      2,
+      0,
+      5,
+      1,
+      "MODEL"
+    ],
+    [
+      8,
+      2,
+      2,
+      5,
+      2,
+      "VAE"
+    ],
+    [
+      9,
+      2,
+      1,
+      5,
+      3,
+      "CLIP"
+    ],
+    [
+      10,
+      2,
+      0,
+      8,
+      0,
+      "MODEL"
+    ],
+    [
+      11,
+      7,
+      0,
+      8,
+      1,
+      "ACESTEP_TRAINING_CONFIG"
+    ]
+  ],
+  "groups": [
+    {
+      "id": 1,
+      "title": "Group",
+      "bounding": [
+        -1948.836186456601,
+        -838.7548134630448,
+        1030.7397681050033,
+        433.55277317625473
+      ],
+      "color": "#3f789e",
+      "font_size": 24,
+      "flags": {}
+    },
+    {
+      "id": 2,
+      "title": "Group",
+      "bounding": [
+        -1945.9186109949806,
+        -355.1014009456545,
+        1718.8387648908624,
+        719.7038687532394
+      ],
+      "color": "#3f789e",
+      "font_size": 24,
+      "flags": {}
+    }
+  ],
+  "config": {},
+  "extra": {
+    "workflowRendererVersion": "LG",
+    "ds": {
+      "scale": 0.7972024500000091,
+      "offset": [
+        2713.9518089085345,
+        1130.1829092370194
+      ]
+    },
+    "frontendVersion": "1.37.11",
+    "VHS_latentpreview": false,
+    "VHS_latentpreviewrate": 0,
+    "VHS_MetadataImage": true,
+    "VHS_KeepIntermediate": true
+  },
+  "version": 0.4
+}
