@@ -29,11 +29,13 @@ LLM_MODELS = [
 ]
 
 DEVICE_OPTIONS = ["auto", "cuda", "cpu"]
-# "pytorch" is the clearly-labelled default and routes to the PyTorch/
-# transformers backend. "pt" is kept as a backward-compatible alias for older
-# saved workflows. Selecting a PyTorch option skips the vLLM import entirely,
-# so there is no "vLLM not available, falling back to PyTorch" warning.
-BACKEND_OPTIONS = ["pytorch", "vllm", "pt"]
+# "pytorch" routes to the PyTorch/transformers backend; "vllm" to vLLM.
+# Choosing "pytorch" skips the vLLM import entirely, so there is no
+# "vLLM not available, falling back to PyTorch" warning. "pt" is deliberately
+# NOT offered in the dropdown (it reads like the .pt pickle/tensor extension),
+# but is still accepted by the normaliser below so older workflows saved with
+# "pt" keep loading.
+BACKEND_OPTIONS = ["pytorch", "vllm"]
 _PYTORCH_BACKEND_ALIASES = {"pytorch", "pt", "torch"}
 
 # System instructions matching the official ACE-Step 5Hz-lm training format
