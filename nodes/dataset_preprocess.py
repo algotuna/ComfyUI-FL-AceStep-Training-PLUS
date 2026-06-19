@@ -164,6 +164,20 @@ class FL_AceStep_PreprocessDataset:
         if not is_acestep_model(model):
             return (output_dir, 0, "Error: Model is not an ACE-Step model")
 
+        # SFT / fine-tuned ACE-Step checkpoints are DiT-only: they carry just
+        # the transformer weights, so a CheckpointLoader fed an SFT file returns
+        # None for VAE and CLIP. Catch that here with an actionable message
+        # instead of a cryptic 'NoneType has no attribute patcher' deeper down.
+        missing = [name for name, obj in (("vae", vae), ("clip", clip)) if obj is None]
+        if missing:
+            return (output_dir, 0,
+                "Error: {0} input is None. SFT / fine-tuned ACE-Step checkpoints "
+                "usually contain only the DiT transformer, so the CheckpointLoader "
+                "returns None for the missing component(s). Load the {0} separately "
+                "from the BASE ACE-Step 1.5 checkpoint and wire it in (for clip you "
+                "can also use a CLIPLoader set to type 'ace'). Keep MODEL from the "
+                "SFT checkpoint.".format(" and ".join(missing)))
+
         labeled_samples = [s for s in samples if s.labeled or s.caption]
         if not labeled_samples:
             return (output_dir, 0, "No labeled samples to preprocess")
