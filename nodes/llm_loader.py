@@ -29,7 +29,12 @@ LLM_MODELS = [
 ]
 
 DEVICE_OPTIONS = ["auto", "cuda", "cpu"]
-BACKEND_OPTIONS = ["pt", "vllm"]
+# "pytorch" is the clearly-labelled default and routes to the PyTorch/
+# transformers backend. "pt" is kept as a backward-compatible alias for older
+# saved workflows. Selecting a PyTorch option skips the vLLM import entirely,
+# so there is no "vLLM not available, falling back to PyTorch" warning.
+BACKEND_OPTIONS = ["pytorch", "vllm", "pt"]
+_PYTORCH_BACKEND_ALIASES = {"pytorch", "pt", "torch"}
 
 # System instructions matching the official ACE-Step 5Hz-lm training format
 UNDERSTAND_INSTRUCTION = (
@@ -380,7 +385,7 @@ class FL_AceStep_LLMLoader:
             "required": {
                 "model_name": (LLM_MODELS, {"default": "acestep-5Hz-lm-1.7B"}),
                 "device": (DEVICE_OPTIONS, {"default": "auto"}),
-                "backend": (BACKEND_OPTIONS, {"default": "pt"}),
+                "backend": (BACKEND_OPTIONS, {"default": "pytorch"}),
             },
             "optional": {
                 "checkpoint_path": ("STRING", {
@@ -399,6 +404,12 @@ class FL_AceStep_LLMLoader:
     def load(self, model_name, device, backend, checkpoint_path=""):
         """Load the LLM model."""
         logger.info(f"Loading ACE-Step LLM: {model_name}")
+
+        # Collapse the PyTorch aliases ("pytorch"/"pt"/"torch") to the internal
+        # "pt" backend so the load logic below has a single value to test and
+        # never touches the vLLM path when a PyTorch option is chosen.
+        if backend in _PYTORCH_BACKEND_ALIASES:
+            backend = "pt"
 
         # Progress bar
         pbar = ProgressBar(2) if ProgressBar else None
