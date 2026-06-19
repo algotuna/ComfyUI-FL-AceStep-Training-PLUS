@@ -59,6 +59,38 @@ class ACEStepLLMHandler:
         self.dtype = dtype
         self.model_name = model_name
 
+    def _ensure_on_device(self):
+        """Bring the model back to self.device if it was offloaded to CPU.
+
+        ComfyUI caches this handler as a node output across runs, so after a
+        prior offload() the weights may sit on CPU while inputs target
+        self.device. Re-home before generating to avoid a device mismatch.
+        """
+        try:
+            current = next(self.model.parameters()).device
+        except StopIteration:
+            return
+        if current != torch.device(self.device):
+            self.model.to(self.device)
+
+    def offload(self):
+        """Move the LLM to CPU and release its VRAM.
+
+        Called once labeling is done so the ~3.4GB PyTorch-loaded LM does not
+        sit resident through the much heavier VAE/text-encoder preprocessing
+        pass on a 16GB card. Re-homed lazily by _ensure_on_device() on reuse.
+        """
+        try:
+            self.model.to("cpu")
+        except Exception:
+            return
+        try:
+            import comfy.model_management as mm
+            mm.soft_empty_cache()
+        except Exception:
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+
     def understand_audio_from_codes(
         self,
         audio_codes: str,
@@ -164,6 +196,7 @@ class ACEStepLLMHandler:
             messages, tokenize=False, add_generation_prompt=True
         )
 
+        self._ensure_on_device()
         inputs = self.tokenizer(prompt, return_tensors="pt").to(self.device)
         input_length = inputs.input_ids.shape[1]
 

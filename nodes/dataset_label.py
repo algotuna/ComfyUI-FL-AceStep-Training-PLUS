@@ -216,6 +216,17 @@ class FL_AceStep_LabelSamples:
             if pbar:
                 pbar.update(1)
 
+        # Offload the LLM to CPU now that labeling is done. On a 16GB card it
+        # otherwise stays resident (~3.4GB for the PyTorch backend) straight
+        # through the much heavier VAE + text-encoder preprocessing pass and
+        # tips it into OOM. The handler re-homes itself on next use.
+        if hasattr(llm, "offload"):
+            try:
+                llm.offload()
+                logger.info("Offloaded labeling LLM to CPU to free VRAM for preprocessing")
+            except Exception as e:
+                logger.warning(f"Could not offload labeling LLM: {e}")
+
         # Build status message
         status = f"Labeled {labeled_count}/{len(samples_to_label)} samples"
         if errors:
