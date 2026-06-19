@@ -123,6 +123,19 @@ def vae_encode_direct(vae_model, audio_tensor: torch.Tensor, device, dtype) -> t
     Returns:
         latents: Latent tensor [B, T_latent, 64]
     """
+    # This bypasses ComfyUI's managed vae.encode(), so we own device placement.
+    # ComfyUI's memory manager can offload the VAE back to CPU after a later,
+    # larger model loads (e.g. the ~9GB text encoder on a 16GB card). If it has,
+    # the raw model's weights are on CPU while audio_in is on GPU, which raises
+    # "Input type (...cuda...) and weight type (...) should be the same". Re-assert
+    # placement here; cheap to check and self-healing if eviction recurs mid-loop.
+    try:
+        model_device = next(vae_model.parameters()).device
+    except StopIteration:
+        model_device = device
+    if model_device != torch.device(device):
+        vae_model.to(device)
+
     audio_in = audio_tensor.to(device=device, dtype=dtype)
     latents = vae_model.encode(audio_in)  # [B, 64, T_latent]
     return latents.transpose(1, 2).float()  # [B, T_latent, 64]
