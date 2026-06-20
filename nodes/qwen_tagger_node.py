@@ -121,7 +121,11 @@ class FL_AceStep_QwenTagger:
         if not force_rediscover and os.path.exists(review_path):
             cache = self._load_cache(review_path)
             if cache:
-                logger.info(f"Loaded cached tags from {review_path}")
+                logger.warning(
+                    f"Using CACHED tags from {review_path} — Qwen did NOT re-run, so "
+                    f"these may be stale (e.g. after a code/audio change). Set "
+                    f"force_rediscover=ON or delete that file to re-tag the audio."
+                )
 
         if cache is None:
             cache = self._discover(samples, tagger, only_unlabeled)
