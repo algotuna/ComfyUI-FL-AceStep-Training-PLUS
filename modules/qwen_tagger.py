@@ -123,14 +123,21 @@ class QwenAudioTagger:
         audios=[...]. Critically, the WRONG name is ignored with a warning
         (not a TypeError), which silently drops the audio - so we must use the
         current name first and only fall back on a genuine TypeError.
+
+        sampling_rate is passed explicitly so the Whisper feature extractor does
+        not warn (and cannot silently mis-handle the rate); we already load the
+        audio at this exact rate in tag_audio().
         """
+        sr = self.processor.feature_extractor.sampling_rate
         try:
             return self.processor(
-                text=text, audio=[audio], return_tensors="pt", padding=True
+                text=text, audio=[audio], sampling_rate=sr,
+                return_tensors="pt", padding=True
             )
         except TypeError:
             return self.processor(
-                text=text, audios=[audio], return_tensors="pt", padding=True
+                text=text, audios=[audio], sampling_rate=sr,
+                return_tensors="pt", padding=True
             )
 
     def tag_audio(self, audio_path: str, max_new_tokens: int = 256) -> dict:
