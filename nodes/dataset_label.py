@@ -68,6 +68,14 @@ class FL_AceStep_LabelSamples:
                     "default": False,
                     "label": "Transcribe lyrics from audio"
                 }),
+                "librosa_bpm": ("BOOLEAN", {
+                    "default": True,
+                    "label": "BPM from librosa (DSP, more reliable than the LLM)"
+                }),
+                "librosa_key": ("BOOLEAN", {
+                    "default": False,
+                    "label": "Key from librosa (approx; OFF = use LLM key)"
+                }),
             }
         }
 
@@ -85,7 +93,9 @@ class FL_AceStep_LabelSamples:
         skip_metas=False,
         only_unlabeled=False,
         format_lyrics=False,
-        transcribe_lyrics=False
+        transcribe_lyrics=False,
+        librosa_bpm=True,
+        librosa_key=False,
     ):
         """Label all samples in the dataset."""
         logger.info("Starting auto-labeling...")
@@ -93,6 +103,11 @@ class FL_AceStep_LabelSamples:
         # Verify this is an ACE-Step model
         if not is_acestep_model(model):
             return (dataset, 0, "Error: Model is not an ACE-Step model")
+
+        # DSP feature estimators (librosa, ISC-licensed). The module import is
+        # light; librosa itself is imported lazily inside these functions, which
+        # return None/"" if it is unavailable so labeling still proceeds.
+        from ..modules.audio_features import estimate_bpm, estimate_key
 
         # Get the tokenizer from the MODEL for audio-to-codes conversion
         tokenizer = get_acestep_tokenizer(model)
@@ -182,10 +197,31 @@ class FL_AceStep_LabelSamples:
                     sample.genre = metadata["genre"]
 
                 if not skip_metas:
-                    if metadata.get("bpm") and sample.bpm is None:
+                    # BPM: prefer librosa's DSP estimate (more reliable than the
+                    # LLM over lossy codes); fall back to the LLM if disabled or
+                    # librosa returns nothing. Note: librosa can octave-error
+                    # (half/double the true tempo).
+                    bpm_set = False
+                    if librosa_bpm:
+                        bpm = estimate_bpm(sample.audio_path)
+                        if bpm:
+                            sample.bpm = bpm
+                            bpm_set = True
+                    if not bpm_set and metadata.get("bpm") and sample.bpm is None:
                         sample.bpm = metadata["bpm"]
-                    if metadata.get("keyscale") and not sample.keyscale:
+
+                    # Key: librosa key detection is only approximate (relative
+                    # major/minor and fifth confusions), so it is opt-in; by
+                    # default the LLM's key is kept.
+                    key_set = False
+                    if librosa_key:
+                        key = estimate_key(sample.audio_path)
+                        if key:
+                            sample.keyscale = key
+                            key_set = True
+                    if not key_set and metadata.get("keyscale") and not sample.keyscale:
                         sample.keyscale = metadata["keyscale"]
+
                     if metadata.get("timesignature"):
                         sample.timesignature = metadata["timesignature"]
 
