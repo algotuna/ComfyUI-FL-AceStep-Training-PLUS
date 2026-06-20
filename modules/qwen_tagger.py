@@ -191,10 +191,19 @@ class QwenAudioTagger:
             logger.warning(f"Qwen returned no JSON object; raw: {response[:200]!r}")
             return result
 
-        try:
-            data = json.loads(match.group())
-        except json.JSONDecodeError:
-            logger.warning(f"Qwen JSON did not parse; raw: {match.group()[:200]!r}")
+        raw_json = match.group()
+        data = None
+        # Some Qwen outputs come back with backslash-escaped quotes
+        # (e.g. {\"genre\": ...}), which is not valid JSON. Try the raw text
+        # first, then an unescaped variant, before giving up.
+        for candidate in (raw_json, raw_json.replace('\\"', '"').replace("\\'", "'")):
+            try:
+                data = json.loads(candidate)
+                break
+            except json.JSONDecodeError:
+                continue
+        if data is None:
+            logger.warning(f"Qwen JSON did not parse; raw: {raw_json[:200]!r}")
             return result
 
         def _clean_list(value):

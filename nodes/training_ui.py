@@ -205,6 +205,15 @@ class FL_AceStep_Train:
     CATEGORY = "FL AceStep/Training"
     OUTPUT_NODE = True
 
+    @classmethod
+    def IS_CHANGED(cls, **kwargs):
+        # Always execute when queued. ComfyUI otherwise caches this node by its
+        # input hash and silently skips training on a re-queue with unchanged
+        # inputs — but the training data is .pt files on disk that ComfyUI
+        # cannot see, so "unchanged inputs" does not mean "nothing to train".
+        # NaN is never equal to itself, so this forces a run every queue.
+        return float("nan")
+
     # CRITICAL: This decorator MUST be here to exit ComfyUI's inference_mode context
     # before the function starts executing. Without this, all tensor operations
     # inside the function will have gradient tracking disabled.
