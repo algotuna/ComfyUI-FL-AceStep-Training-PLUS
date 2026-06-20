@@ -90,35 +90,47 @@ class QwenAudioTagger:
     def offload(self):
         """Fully release the model and free its VRAM.
 
-        device_map models cannot be moved to CPU with .to(), so we drop the
-        reference and clear the allocator. The model is reloaded lazily on the
-        next tag_audio() call.
+        A device_map model keeps accelerate hooks that hold its GPU tensors
+        alive, so merely dropping the reference can leave ~12GB resident and
+        OOM the next stage (preprocessing). Remove the hooks first, drop the
+        reference, then hard-clear the CUDA cache. Reloaded lazily on the next
+        tag_audio() call.
         """
+        model = self.model
         self.model = None
+        if model is not None:
+            try:
+                from accelerate.hooks import remove_hook_from_module  # noqa: PLC0415
+                remove_hook_from_module(model, recurse=True)
+            except Exception:  # noqa: BLE001
+                pass
+            del model
         gc.collect()
         try:
-            import comfy.model_management as mm  # noqa: PLC0415
-            mm.soft_empty_cache()
-        except Exception:  # noqa: BLE001
             import torch  # noqa: PLC0415
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
+                torch.cuda.synchronize()
+        except Exception:  # noqa: BLE001
+            pass
 
     # -- tagging ----------------------------------------------------------
 
     def _run_processor(self, text, audio):
-        """Call the processor, tolerating the audios=/audio= API variation.
+        """Call the processor, tolerating the audio=/audios= API variation.
 
-        Qwen2-Audio historically used audios=[...]; some transformers builds
-        renamed it audio=[...]. Try the documented name first, fall back.
+        Current transformers expects audio=[...]; older Qwen2-Audio builds used
+        audios=[...]. Critically, the WRONG name is ignored with a warning
+        (not a TypeError), which silently drops the audio - so we must use the
+        current name first and only fall back on a genuine TypeError.
         """
         try:
             return self.processor(
-                text=text, audios=[audio], return_tensors="pt", padding=True
+                text=text, audio=[audio], return_tensors="pt", padding=True
             )
         except TypeError:
             return self.processor(
-                text=text, audio=[audio], return_tensors="pt", padding=True
+                text=text, audios=[audio], return_tensors="pt", padding=True
             )
 
     def tag_audio(self, audio_path: str, max_new_tokens: int = 256) -> dict:

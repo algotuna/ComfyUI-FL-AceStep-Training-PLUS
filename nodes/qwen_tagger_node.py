@@ -83,6 +83,18 @@ class FL_AceStep_QwenTagger:
     FUNCTION = "tag"
     CATEGORY = "FL AceStep/Dataset"
 
+    @classmethod
+    def IS_CHANGED(cls, force_rediscover=False, **kwargs):
+        # ComfyUI caches a node when its inputs are unchanged, which would stop
+        # this node from ever re-running on an otherwise-identical graph. When
+        # force_rediscover is ON, return a unique value each call so ComfyUI
+        # always re-executes (and our cache-aware tag() then re-runs Qwen).
+        # When OFF, return a stable value so normal caching applies.
+        if force_rediscover:
+            import time  # noqa: PLC0415
+            return time.time()
+        return False
+
     # ------------------------------------------------------------------ #
 
     def tag(
