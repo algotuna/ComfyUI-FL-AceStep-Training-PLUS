@@ -156,6 +156,17 @@ class FL_AceStep_QwenTagger:
     # ------------------------------------------------------------------ #
 
     def _discover(self, samples, tagger, only_unlabeled) -> dict:
+        # Evict ComfyUI's resident models (DiT, VAE, text encoder) before Qwen's
+        # ~12GB load, or they collide and OOM on a 16GB card. They reload on
+        # demand when Preprocess runs after this node.
+        try:
+            import comfy.model_management as mm  # noqa: PLC0415
+            mm.unload_all_models()
+            mm.soft_empty_cache()
+            logger.info("Unloaded ComfyUI models to make room for Qwen2-Audio")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"Could not unload ComfyUI models before Qwen: {exc}")
+
         targets = [
             s for s in samples
             if not (only_unlabeled and (s.labeled or s.caption))

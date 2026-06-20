@@ -223,8 +223,8 @@ def load_qwen_audio_tagger(device: str = "cuda", model_id: str = QWEN_AUDIO_MODE
     logger.info(f"Loading Qwen2-Audio processor from {source}")
     processor = AutoProcessor.from_pretrained(source)
 
-    tagger = QwenAudioTagger(processor=processor, device=device, source=source, model_id=model_id)
-    # Eagerly load the model so the Loader node reports a real load cost; it is
-    # released later by the tagger node's offload() once discovery completes.
-    tagger._load_model()
-    return tagger
+    # Lazy: only the light processor is loaded here. The 7B model is loaded on
+    # the first tag_audio() call, AFTER the tagger node has evicted ComfyUI's
+    # resident models — otherwise Qwen (~12GB) collides with the LLM/DiT and
+    # OOMs on a 16GB card. Released again by offload() when discovery finishes.
+    return QwenAudioTagger(processor=processor, device=device, source=source, model_id=model_id)

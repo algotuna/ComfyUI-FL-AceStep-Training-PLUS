@@ -62,5 +62,7 @@ class FL_AceStep_QwenAudioLoader:
         if pbar:
             pbar.update(1)
 
-        logger.info("Qwen2-Audio tagger loaded")
+        # Only the processor is resident now; the 7B model is loaded lazily by
+        # the tagger node after it evicts other models, to avoid a 16GB OOM.
+        logger.info("Qwen2-Audio processor ready (model loads when tagging starts)")
         return (tagger,)
