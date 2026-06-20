@@ -74,6 +74,7 @@ try:
     # Loaders
     from .nodes.llm_loader import FL_AceStep_LLMLoader
     from .nodes.qwen_loader import FL_AceStep_QwenAudioLoader
+    from .nodes.scragvae_loader import FL_AceStep_ScragVAELoader
 
     # Dataset nodes
     from .nodes.dataset_scan import FL_AceStep_ScanDirectory
@@ -89,6 +90,7 @@ try:
         # Loaders
         "FL_AceStep_LLMLoader": FL_AceStep_LLMLoader,
         "FL_AceStep_QwenAudioLoader": FL_AceStep_QwenAudioLoader,
+        "FL_AceStep_ScragVAELoader": FL_AceStep_ScragVAELoader,
 
         # Dataset
         "FL_AceStep_ScanDirectory": FL_AceStep_ScanDirectory,
@@ -105,6 +107,7 @@ try:
         # Loaders
         "FL_AceStep_LLMLoader": "FL AceStep LLM Loader",
         "FL_AceStep_QwenAudioLoader": "FL AceStep Qwen2-Audio Loader (PLUS)",
+        "FL_AceStep_ScragVAELoader": "FL AceStep ScragVAE Loader (HQ)",
 
         # Dataset
         "FL_AceStep_ScanDirectory": "FL AceStep Scan Audio Directory",

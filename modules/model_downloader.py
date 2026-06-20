@@ -43,6 +43,8 @@ MODEL_REGISTRY: Dict[str, str] = {
     # VAE and text encoder (part of main repo)
     "vae": MAIN_MODEL_REPO,
     "Qwen3-Embedding-0.6B": MAIN_MODEL_REPO,
+    # Community VAE replacement with improved high-frequency reconstruction
+    "scragvae": "scragnog/Ace-Step-1.5-ScragVAE",
 }
 
 # Components included in the main model download
@@ -261,3 +263,46 @@ def list_available_models(models_dir: Optional[Path] = None) -> Dict[str, bool]:
         status[model_name] = check_model_exists(model_name, models_dir)
 
     return status
+
+
+def ensure_scrag_vae(
+    models_dir: Optional[Path] = None,
+    token: Optional[str] = None,
+) -> Tuple[bool, str]:
+    """
+    Ensure the ScragVAE model is available, downloading if necessary.
+
+    ScragVAE is a community fine-tune of the ACEStep 1.5 VAE decoder that
+    improves high-frequency reconstruction (10–20 kHz) by disabling perceptual
+    HF de-emphasis and adding adversarial + time-domain losses.
+
+    Downloads only the safetensors weights; skips the GGUF variant.
+    """
+    if not HF_AVAILABLE:
+        return False, "huggingface_hub not installed. Run: pip install huggingface-hub"
+
+    if models_dir is None:
+        models_dir = get_acestep_models_dir()
+
+    scragvae_dir = models_dir / "scragvae"
+
+    if check_model_exists("scragvae", models_dir):
+        return True, f"ScragVAE already available at {scragvae_dir}"
+
+    logger.info("ScragVAE not found. Downloading from scragnog/Ace-Step-1.5-ScragVAE...")
+    logger.info("Downloading diffusion_pytorch_model.safetensors (~675 MB) + config...")
+
+    try:
+        from huggingface_hub import snapshot_download
+        snapshot_download(
+            repo_id="scragnog/Ace-Step-1.5-ScragVAE",
+            local_dir=str(scragvae_dir),
+            local_dir_use_symlinks=False,
+            ignore_patterns=["*.gguf", "*.md", ".gitattributes"],
+            token=token,
+        )
+        return True, f"ScragVAE downloaded to {scragvae_dir}"
+    except Exception as e:
+        error_msg = f"Failed to download ScragVAE: {str(e)}"
+        logger.error(error_msg)
+        return False, error_msg
