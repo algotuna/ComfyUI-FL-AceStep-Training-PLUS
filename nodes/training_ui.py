@@ -748,6 +748,27 @@ class FL_AceStep_Train:
                         epoch_loss += avg_step_loss
                         num_updates += 1
 
+                        # Emit progress here too. This epoch-end flush is the ONLY
+                        # place an optimizer step happens whenever the number of
+                        # micro-batches per epoch is smaller than
+                        # gradient_accumulation_steps (e.g. a 1-sample dataset with
+                        # grad-accum 8 — the in-loop path above never reaches its
+                        # threshold). Without this send the live UI/visualizer never
+                        # update even though training and checkpoints proceed fine.
+                        loss_history.append({
+                            "step": global_step,
+                            "loss": avg_step_loss,
+                        })
+                        send_training_update(unique_id, {
+                            "type": "progress",
+                            "epoch": epoch + 1,
+                            "total_epochs": training_config.max_epochs,
+                            "step": global_step,
+                            "loss": avg_step_loss,
+                            "lr": scheduler.get_last_lr()[0],
+                            "loss_history": loss_history,
+                        })
+
                         if pbar:
                             pbar.update(1)
 
