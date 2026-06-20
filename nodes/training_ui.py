@@ -193,6 +193,16 @@ class FL_AceStep_Train:
                     "multiline": False,
                     "placeholder": "Path to checkpoint to resume from"
                 }),
+                "preprocess_path": ("STRING", {
+                    "forceInput": True,
+                    "tooltip": (
+                        "Wire the Preprocess node's 'output_path' output here. This "
+                        "forces training to run AFTER preprocessing (correct order) "
+                        "and reads the freshly-written tensors. When connected it "
+                        "overrides the tensor_dir text field. Without it, ComfyUI can "
+                        "run training before preprocessing finishes -> 'Loaded 0 samples'."
+                    ),
+                }),
             },
             "hidden": {
                 "unique_id": "UNIQUE_ID",
@@ -218,8 +228,14 @@ class FL_AceStep_Train:
     # before the function starts executing. Without this, all tensor operations
     # inside the function will have gradient tracking disabled.
     @torch.inference_mode(False)
-    def train(self, model, config, tensor_dir, lora_name="my_lora", resume_from="", unique_id=None):
+    def train(self, model, config, tensor_dir, lora_name="my_lora", resume_from="",
+              preprocess_path="", unique_id=None):
         """Run the training loop."""
+        # When wired from the Preprocess node's output_path, this both forces
+        # the correct run order (train after preprocessing) and points at the
+        # freshly-written tensors, overriding the tensor_dir text field.
+        if preprocess_path and preprocess_path.strip():
+            tensor_dir = preprocess_path.strip()
         logger.info(f"Starting ACE-Step LoRA training: {lora_name}")
 
         # Verify this is an ACE-Step model
