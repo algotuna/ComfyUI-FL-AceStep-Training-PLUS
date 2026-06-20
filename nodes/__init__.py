@@ -8,7 +8,7 @@ from .dataset_label import FL_AceStep_LabelSamples
 from .dataset_preprocess import FL_AceStep_PreprocessDataset
 from .training_config import FL_AceStep_TrainingConfig
 from .training_ui import FL_AceStep_Train
-from .scragvae_loader import FL_AceStep_ScragVAELoader
+from .vae_loader import FL_AceStep_VAELoader
 
 __all__ = [
     "FL_AceStep_LLMLoader",
@@ -17,5 +17,5 @@ __all__ = [
     "FL_AceStep_PreprocessDataset",
     "FL_AceStep_TrainingConfig",
     "FL_AceStep_Train",
-    "FL_AceStep_ScragVAELoader",
+    "FL_AceStep_VAELoader",
 ]
