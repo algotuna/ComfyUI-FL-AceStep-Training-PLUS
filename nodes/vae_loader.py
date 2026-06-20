@@ -1,14 +1,17 @@
 """
 ACEStep VAE Loader Node
 
-Standalone VAE loader for ACEStep 1.5. Picks a variant from a dropdown and
-loads it directly — no input VAE connection required. Downloads from HuggingFace
-on first use if the weights are not already present.
+Standalone VAE loader for ACEStep 1.5 — no input VAE connection required.
+Pick a variant; the file is fetched on first use and a ComfyUI VAE is built
+from it directly (the hosted files are already in ComfyUI key format, so no
+diffusers->comfy conversion is needed).
 
 Variants:
-  stock    — ACE-Step/Ace-Step1.5 VAE (standard quality)
-  ScragVAE — scragnog/Ace-Step-1.5-ScragVAE (improved 10-20 kHz reconstruction,
-             fixes metallic high-frequency sibilance in SFT outputs)
+  ScragVAE (HQ) — community fine-tuned decoder that fixes the metallic
+                  high-frequency sibilance in SFT outputs (improved 10-20 kHz
+                  reconstruction). Hosted on this repo's GitHub releases,
+                  sha256-verified, faithful re-key of scragnog/Ace-Step-1.5-ScragVAE.
+  stock         — official ACE-Step 1.5 VAE (Comfy-Org repackaged).
 """
 
 import logging
@@ -17,37 +20,41 @@ import safetensors.torch
 
 from ..modules.model_downloader import (
     get_acestep_models_dir,
-    ensure_main_model,
     ensure_scrag_vae,
+    ensure_stock_comfy_vae,
+    VAE_HQ_DIRNAME,
+    SCRAGVAE_FILENAME,
+    STOCK_VAE_FILENAME,
 )
 
 logger = logging.getLogger("FL_AceStep_Training")
 
-VAE_VARIANTS = ["stock", "ScragVAE (HQ)"]
+VAE_VARIANTS = ["ScragVAE (HQ)", "stock"]
 
 
 class FL_AceStep_VAELoader:
     """
     ACEStep VAE Loader
 
-    Loads the ACEStep 1.5 VAE directly — no need to pipe a VAE from a
+    Loads an ACEStep 1.5 VAE directly — no need to pipe a VAE in from a
     checkpoint loader. Select a variant and wire the output VAE into any
     downstream node (Preprocess Dataset, generation, etc.).
 
-    Auto-downloads weights on first use.
+    ScragVAE (the default) fixes the metallic high-frequency sibilance in
+    SFT-generated tracks. Weights auto-download on first use.
     """
 
     @classmethod
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "variant": (VAE_VARIANTS, {"default": "stock"}),
+                "variant": (VAE_VARIANTS, {"default": "ScragVAE (HQ)"}),
             },
             "optional": {
                 "hf_token": ("STRING", {
                     "default": "",
                     "multiline": False,
-                    "placeholder": "HuggingFace token (only needed for gated repos)",
+                    "placeholder": "HuggingFace token (only if the stock download is rate-limited)",
                 }),
             },
         }
@@ -57,32 +64,25 @@ class FL_AceStep_VAELoader:
     FUNCTION = "load"
     CATEGORY = "FL AceStep/Models"
 
-    def load(self, variant="stock", hf_token=""):
+    def load(self, variant="ScragVAE (HQ)", hf_token=""):
         import comfy.sd
 
         token = hf_token.strip() or None
         models_dir = get_acestep_models_dir()
 
-        if variant == "stock":
-            weights_path = models_dir / "vae" / "diffusion_pytorch_model.safetensors"
-            if not weights_path.exists():
-                logger.info("Stock ACEStep VAE not found — downloading main model (~several GB)...")
-                success, msg = ensure_main_model(models_dir, token=token)
-                if not success:
-                    raise RuntimeError(f"Stock VAE download failed: {msg}")
+        if variant.startswith("ScragVAE"):
+            success, msg = ensure_scrag_vae(models_dir, token=token)
+            filename = SCRAGVAE_FILENAME
         else:
-            weights_path = models_dir / "scragvae" / "diffusion_pytorch_model.safetensors"
-            if not weights_path.exists():
-                logger.info("ScragVAE not cached — downloading (~675 MB)...")
-                success, msg = ensure_scrag_vae(models_dir, token=token)
-                if not success:
-                    raise RuntimeError(f"ScragVAE download failed: {msg}")
+            success, msg = ensure_stock_comfy_vae(models_dir, token=token)
+            filename = STOCK_VAE_FILENAME
 
+        if not success:
+            raise RuntimeError(msg)
+
+        weights_path = models_dir / VAE_HQ_DIRNAME / filename
         if not weights_path.exists():
-            raise RuntimeError(
-                f"VAE weights not found at {weights_path} after download attempt. "
-                "Check your internet connection and models directory."
-            )
+            raise RuntimeError(f"VAE file missing after download: {weights_path}")
 
         logger.info(f"Loading {variant} VAE from {weights_path}")
         sd = safetensors.torch.load_file(str(weights_path), device="cpu")
