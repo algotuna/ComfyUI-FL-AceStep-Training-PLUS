@@ -217,26 +217,75 @@ class QwenAudioTagger:
         return result
 
 
+def resolve_qwen_dir(model_path: str = "") -> str:
+    """Resolve the local directory the Qwen model lives in / downloads to.
+
+    - empty            -> <models_dir>/acestep/Qwen2-Audio-7B-Instruct
+    - relative path    -> joined under <models_dir> (e.g. "diffusion_models/
+                          qwen/Qwen2-Audio-7B-Instruct")
+    - absolute path    -> used as-is
+    """
+    import os  # noqa: PLC0415
+
+    try:
+        import folder_paths  # noqa: PLC0415
+        models_dir = folder_paths.models_dir
+    except Exception:  # noqa: BLE001
+        models_dir = os.path.abspath("./models")
+
+    model_path = (model_path or "").strip()
+    if not model_path:
+        return os.path.join(models_dir, "acestep", "Qwen2-Audio-7B-Instruct")
+    if os.path.isabs(model_path):
+        return model_path
+    return os.path.join(models_dir, model_path)
+
+
+def ensure_qwen_downloaded(target_dir: str, repo_id: str = QWEN_AUDIO_MODEL_ID) -> str:
+    """Download the model into target_dir (clean filenames) if missing.
+
+    Uses snapshot_download with a real local dir so files land as
+    config.json / *.safetensors / tokenizer.json etc. in the ComfyUI tree,
+    not as HF content-addressed cache blobs. Returns target_dir.
+    """
+    import os  # noqa: PLC0415
+
+    if os.path.exists(os.path.join(target_dir, "config.json")):
+        return target_dir
+
+    from huggingface_hub import snapshot_download  # noqa: PLC0415
+
+    os.makedirs(target_dir, exist_ok=True)
+    logger.info(f"Downloading {repo_id} -> {target_dir} (first run, ~16GB)...")
+    try:
+        snapshot_download(repo_id=repo_id, local_dir=target_dir,
+                          local_dir_use_symlinks=False)
+    except TypeError:
+        # local_dir_use_symlinks was removed in newer huggingface_hub, which
+        # already copies real files into local_dir by default.
+        snapshot_download(repo_id=repo_id, local_dir=target_dir)
+    logger.info(f"Qwen2-Audio ready at {target_dir}")
+    return target_dir
+
+
 def load_qwen_audio_tagger(device: str = "cuda", model_id: str = QWEN_AUDIO_MODEL_ID,
                            model_path: str = "") -> QwenAudioTagger:
     """Load the Qwen2-Audio processor and return a QwenAudioTagger.
 
-    The heavy model is loaded on first tag_audio() (or eagerly via
-    _load_model() below) and released by offload(); only the light processor is
-    held by the returned handler.
+    The model is downloaded into the ComfyUI models tree on first use (clean
+    filenames, not HF cache blobs) and loaded from there. Only the light
+    processor is held here; the 7B model loads lazily on the first tag_audio()
+    (after the tagger node evicts other models) and is freed by offload().
 
     device: "cuda" or "cpu" (resolve "auto" before calling).
-    model_path: optional local directory; if empty, the HF hub id is used and
-        transformers auto-downloads to the HF cache.
+    model_path: target directory (see resolve_qwen_dir); empty = default
+        <models_dir>/acestep/Qwen2-Audio-7B-Instruct.
     """
     from transformers import AutoProcessor  # noqa: PLC0415
 
-    source = model_path.strip() if model_path and model_path.strip() else model_id
-    logger.info(f"Loading Qwen2-Audio processor from {source}")
-    processor = AutoProcessor.from_pretrained(source)
+    target_dir = resolve_qwen_dir(model_path)
+    ensure_qwen_downloaded(target_dir, model_id)
 
-    # Lazy: only the light processor is loaded here. The 7B model is loaded on
-    # the first tag_audio() call, AFTER the tagger node has evicted ComfyUI's
-    # resident models — otherwise Qwen (~12GB) collides with the LLM/DiT and
-    # OOMs on a 16GB card. Released again by offload() when discovery finishes.
-    return QwenAudioTagger(processor=processor, device=device, source=source, model_id=model_id)
+    logger.info(f"Loading Qwen2-Audio processor from {target_dir}")
+    processor = AutoProcessor.from_pretrained(target_dir)
+    return QwenAudioTagger(processor=processor, device=device, source=target_dir, model_id=model_id)
