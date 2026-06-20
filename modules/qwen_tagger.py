@@ -1,0 +1,230 @@
+"""Qwen2-Audio open-vocabulary music tagger.
+
+Phase 1 of the tagging pipeline. Qwen2-Audio "listens" to each track and
+returns free-form structured tags (genre / instruments / moods / a short
+description) WITHOUT any pre-curated label list — it discovers the vocabulary
+from the audio itself. This is the answer to the "I can't pre-list every
+instrument in 100 unaudited songs" problem.
+
+Licensing: Qwen2-Audio-7B-Instruct is Apache-2.0 (commercial use permitted).
+
+Memory: the 7B model is heavy for a 16GB card, so it loads via accelerate's
+device_map (CPU offload as needed). Because an accelerate-dispatched model
+cannot be hand-moved to CPU afterwards, offload() FULLY RELEASES the model to
+free VRAM before the rest of the dataset pipeline runs; tag_audio() lazily
+reloads it if called again. bitsandbytes 8-bit is deliberately avoided: no
+guaranteed sm_120 (Blackwell) kernels.
+
+Heavy imports (transformers, librosa, torch) live INSIDE methods so a missing
+optional dependency never breaks node registration at ComfyUI startup.
+"""
+
+from __future__ import annotations
+
+import gc
+import json
+import logging
+import re
+
+logger = logging.getLogger("FL_AceStep_Training")
+
+QWEN_AUDIO_MODEL_ID = "Qwen/Qwen2-Audio-7B-Instruct"
+
+# The discovery prompt. We ask for STRICT JSON so the output parses
+# deterministically. Qwen is told to use concise, lowercase, conventional
+# tag words (so aggregation downstream can dedupe synonyms) and to only list
+# instruments it is reasonably confident it can hear (curbs hallucination).
+_DISCOVERY_PROMPT = (
+    "Listen to this music and identify its style. Respond with ONLY a JSON "
+    "object, no prose before or after, in exactly this form:\n"
+    '{"genre": ["..."], "instruments": ["..."], "moods": ["..."], '
+    '"description": "one short sentence"}\n\n'
+    "Rules:\n"
+    "- Use concise, lowercase, conventional tag words (e.g. \"drum and bass\", "
+    "\"electric guitar\", \"oud\", \"energetic\").\n"
+    "- genre: 1-3 entries, most specific first.\n"
+    "- instruments: only instruments you can actually hear; name the specific "
+    "instrument if you can (e.g. \"oud\" not \"string instrument\").\n"
+    "- moods: 1-3 mood/energy words.\n"
+    "- Do not invent instruments you are unsure about."
+)
+
+
+class QwenAudioTagger:
+    """Handler wrapping Qwen2-Audio for open-vocabulary music tagging.
+
+    The processor is kept resident (it is light); the model is released by
+    offload() and reloaded on demand so a tagging pass can hand VRAM back to
+    the preprocessing/training stages on a 16GB card.
+    """
+
+    def __init__(self, processor, device, source, model_id=QWEN_AUDIO_MODEL_ID):
+        self.processor = processor
+        self.device = device
+        self.source = source          # local dir or HF hub id
+        self.model_id = model_id
+        self.model = None             # loaded lazily / released by offload()
+
+    # -- lifecycle --------------------------------------------------------
+
+    def _load_model(self):
+        """(Re)load the model if it is not currently resident."""
+        if self.model is not None:
+            return
+        import torch  # noqa: PLC0415
+        from transformers import Qwen2AudioForConditionalGeneration  # noqa: PLC0415
+
+        logger.info(f"Loading Qwen2-Audio model from {self.source} (device={self.device})")
+        if self.device == "cuda" and torch.cuda.is_available():
+            self.model = Qwen2AudioForConditionalGeneration.from_pretrained(
+                self.source,
+                dtype=torch.bfloat16,
+                device_map="auto",        # accelerate handles 16GB offload
+            )
+        else:
+            self.model = Qwen2AudioForConditionalGeneration.from_pretrained(
+                self.source, dtype=torch.float32
+            ).to("cpu")
+        self.model.eval()
+
+    def offload(self):
+        """Fully release the model and free its VRAM.
+
+        device_map models cannot be moved to CPU with .to(), so we drop the
+        reference and clear the allocator. The model is reloaded lazily on the
+        next tag_audio() call.
+        """
+        self.model = None
+        gc.collect()
+        try:
+            import comfy.model_management as mm  # noqa: PLC0415
+            mm.soft_empty_cache()
+        except Exception:  # noqa: BLE001
+            import torch  # noqa: PLC0415
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+
+    # -- tagging ----------------------------------------------------------
+
+    def _run_processor(self, text, audio):
+        """Call the processor, tolerating the audios=/audio= API variation.
+
+        Qwen2-Audio historically used audios=[...]; some transformers builds
+        renamed it audio=[...]. Try the documented name first, fall back.
+        """
+        try:
+            return self.processor(
+                text=text, audios=[audio], return_tensors="pt", padding=True
+            )
+        except TypeError:
+            return self.processor(
+                text=text, audio=[audio], return_tensors="pt", padding=True
+            )
+
+    def tag_audio(self, audio_path: str, max_new_tokens: int = 256) -> dict:
+        """Tag one audio file. Returns a normalised dict:
+
+            {"genre": [...], "instruments": [...], "moods": [...],
+             "description": "..."}
+
+        Never raises for ordinary failures — on error returns empty lists so a
+        single bad file does not abort the whole dataset pass.
+        """
+        import librosa  # noqa: PLC0415
+        import torch  # noqa: PLC0415
+
+        self._load_model()
+
+        try:
+            sr = self.processor.feature_extractor.sampling_rate
+            audio, _ = librosa.load(audio_path, sr=sr, mono=True)
+
+            conversation = [
+                {"role": "user", "content": [
+                    {"type": "audio", "audio_url": audio_path},
+                    {"type": "text", "text": _DISCOVERY_PROMPT},
+                ]},
+            ]
+            text = self.processor.apply_chat_template(
+                conversation, add_generation_prompt=True, tokenize=False
+            )
+            inputs = self._run_processor(text, audio)
+            inputs = inputs.to(self.model.device)
+
+            with torch.no_grad():
+                generated = self.model.generate(**inputs, max_new_tokens=max_new_tokens)
+
+            # Strip the prompt tokens, decode only the completion.
+            generated = generated[:, inputs.input_ids.size(1):]
+            response = self.processor.batch_decode(
+                generated, skip_special_tokens=True
+            )[0]
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"Qwen tagging failed for {audio_path}: {exc}")
+            return {"genre": [], "instruments": [], "moods": [], "description": ""}
+
+        return self._parse_tags(response)
+
+    @staticmethod
+    def _parse_tags(response: str) -> dict:
+        """Extract the JSON object from Qwen's reply and normalise it.
+
+        Robust to surrounding prose / markdown fences: grabs the first {...}
+        block. Falls back to empty lists if no valid JSON is present.
+        """
+        result = {"genre": [], "instruments": [], "moods": [], "description": ""}
+
+        match = re.search(r"\{.*\}", response, re.DOTALL)
+        if not match:
+            logger.warning(f"Qwen returned no JSON object; raw: {response[:200]!r}")
+            return result
+
+        try:
+            data = json.loads(match.group())
+        except json.JSONDecodeError:
+            logger.warning(f"Qwen JSON did not parse; raw: {match.group()[:200]!r}")
+            return result
+
+        def _clean_list(value):
+            if isinstance(value, str):
+                value = [value]
+            if not isinstance(value, list):
+                return []
+            out = []
+            for item in value:
+                tag = str(item).strip().lower()
+                if tag and tag not in out:
+                    out.append(tag)
+            return out
+
+        result["genre"] = _clean_list(data.get("genre"))
+        result["instruments"] = _clean_list(data.get("instruments"))
+        result["moods"] = _clean_list(data.get("moods"))
+        desc = data.get("description", "")
+        result["description"] = str(desc).strip() if isinstance(desc, (str, int, float)) else ""
+        return result
+
+
+def load_qwen_audio_tagger(device: str = "cuda", model_id: str = QWEN_AUDIO_MODEL_ID,
+                           model_path: str = "") -> QwenAudioTagger:
+    """Load the Qwen2-Audio processor and return a QwenAudioTagger.
+
+    The heavy model is loaded on first tag_audio() (or eagerly via
+    _load_model() below) and released by offload(); only the light processor is
+    held by the returned handler.
+
+    device: "cuda" or "cpu" (resolve "auto" before calling).
+    model_path: optional local directory; if empty, the HF hub id is used and
+        transformers auto-downloads to the HF cache.
+    """
+    from transformers import AutoProcessor  # noqa: PLC0415
+
+    source = model_path.strip() if model_path and model_path.strip() else model_id
+    logger.info(f"Loading Qwen2-Audio processor from {source}")
+    processor = AutoProcessor.from_pretrained(source)
+
+    tagger = QwenAudioTagger(processor=processor, device=device, source=source, model_id=model_id)
+    # Eagerly load the model so the Loader node reports a real load cost; it is
+    # released later by the tagger node's offload() once discovery completes.
+    tagger._load_model()
+    return tagger

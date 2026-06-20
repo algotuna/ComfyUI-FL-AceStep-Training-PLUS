@@ -41,6 +41,8 @@ class AudioSample:
     filename: str
     caption: str = ""
     genre: str = ""
+    instruments: str = ""  # comma-joined, from the Qwen tagger
+    moods: str = ""        # comma-joined, from the Qwen tagger
     lyrics: str = ""
     raw_lyrics: str = ""  # Original user-provided lyrics from .txt
     formatted_lyrics: str = ""  # LM-formatted lyrics

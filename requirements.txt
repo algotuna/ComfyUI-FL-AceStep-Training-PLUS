@@ -5,8 +5,13 @@ torch>=2.0.0
 torchaudio>=2.0.0
 
 # Transformers and Diffusers
-transformers>=4.40.0
+# 4.45+ required for the Qwen2-Audio tagger (Qwen2AudioForConditionalGeneration).
+transformers>=4.45.0
 diffusers>=0.28.0
+
+# Qwen2-Audio open-vocabulary style tagger (PLUS): the processor loads audio
+# via librosa. Apache-2.0 model, auto-downloaded on first use.
+librosa>=0.10.0
 
 # LoRA (PEFT)
 peft>=0.10.0

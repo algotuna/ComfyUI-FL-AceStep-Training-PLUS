@@ -73,10 +73,12 @@ except ImportError:
 try:
     # Loaders
     from .nodes.llm_loader import FL_AceStep_LLMLoader
+    from .nodes.qwen_loader import FL_AceStep_QwenAudioLoader
 
     # Dataset nodes
     from .nodes.dataset_scan import FL_AceStep_ScanDirectory
     from .nodes.dataset_label import FL_AceStep_LabelSamples
+    from .nodes.qwen_tagger_node import FL_AceStep_QwenTagger
     from .nodes.dataset_preprocess import FL_AceStep_PreprocessDataset
 
     # Training nodes
@@ -86,10 +88,12 @@ try:
     NODE_CLASS_MAPPINGS = {
         # Loaders
         "FL_AceStep_LLMLoader": FL_AceStep_LLMLoader,
+        "FL_AceStep_QwenAudioLoader": FL_AceStep_QwenAudioLoader,
 
         # Dataset
         "FL_AceStep_ScanDirectory": FL_AceStep_ScanDirectory,
         "FL_AceStep_LabelSamples": FL_AceStep_LabelSamples,
+        "FL_AceStep_QwenTagger": FL_AceStep_QwenTagger,
         "FL_AceStep_PreprocessDataset": FL_AceStep_PreprocessDataset,
 
         # Training
@@ -100,10 +104,12 @@ try:
     NODE_DISPLAY_NAME_MAPPINGS = {
         # Loaders
         "FL_AceStep_LLMLoader": "FL AceStep LLM Loader",
+        "FL_AceStep_QwenAudioLoader": "FL AceStep Qwen2-Audio Loader (PLUS)",
 
         # Dataset
         "FL_AceStep_ScanDirectory": "FL AceStep Scan Audio Directory",
         "FL_AceStep_LabelSamples": "FL AceStep Auto-Label Samples",
+        "FL_AceStep_QwenTagger": "FL AceStep Qwen Style Tagger (PLUS)",
         "FL_AceStep_PreprocessDataset": "FL AceStep Preprocess Dataset",
 
         # Training (PLUS: memory controls added — see FORK_NOTES.md)
