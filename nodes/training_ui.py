@@ -685,6 +685,22 @@ class FL_AceStep_Train:
                             # Cast to fp32 for stable backward pass
                             loss = diffusion_loss.float()
 
+                        except torch.cuda.OutOfMemoryError as e:
+                            # At the VRAM ceiling. Defragment so the next step has
+                            # the best chance, and drop any partial gradients from
+                            # this accumulation window (their tensors are dead
+                            # weight now). The real fix is gradient_checkpointing.
+                            optimizer.zero_grad(set_to_none=True)
+                            accumulated_loss = 0.0
+                            accumulation_step = 0
+                            torch.cuda.empty_cache()
+                            logger.warning(
+                                "Forward pass OOM - skipped a micro-batch and cleared "
+                                "the cache. Enable gradient_checkpointing in the Training "
+                                f"Config to stop this (and/or set "
+                                f"PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True). ({e})"
+                            )
+                            continue
                         except Exception as e:
                             logger.warning(f"Forward pass error: {e}")
                             continue
