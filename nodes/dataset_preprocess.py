@@ -192,7 +192,12 @@ class FL_AceStep_PreprocessDataset:
         # Use a single vae.encode() call to trigger the loading, then use the
         # underlying model directly for the rest of the loop
         vae_model = vae.first_stage_model
-        vae_dtype = vae.vae_dtype
+        # Some ComfyUI builds (e.g. 0.25.x) no longer expose `vae_dtype` on the
+        # VAE object, which raised `'VAE' object has no attribute 'vae_dtype'`.
+        # Fall back to the VAE weights' own dtype when the attribute is absent.
+        vae_dtype = getattr(vae, "vae_dtype", None)
+        if vae_dtype is None:
+            vae_dtype = next(vae_model.parameters()).dtype
         if model_management:
             model_management.load_models_gpu(
                 [vae.patcher],
