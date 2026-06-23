@@ -102,6 +102,11 @@ class ACEStepDatasetBuilder:
         for ext in SUPPORTED_AUDIO_EXTENSIONS:
             audio_files.extend(directory_path.rglob(f"*{ext}"))
 
+        # Skip hidden / macOS AppleDouble sidecar files (e.g. "._name.wav") that
+        # match by extension but are not real audio — soundfile can't open them
+        # and they otherwise inflate the count and spam warnings.
+        audio_files = [p for p in audio_files if not p.name.startswith(".")]
+
         # Sort by name
         audio_files = sorted(audio_files)
 
