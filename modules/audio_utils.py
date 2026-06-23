@@ -56,11 +56,11 @@ def load_audio(audio_path: str, max_duration: float = None) -> Tuple[torch.Tenso
             _RESAMPLER_CACHE[cache_key] = torchaudio.transforms.Resample(sr, SAMPLE_RATE)
         waveform = _RESAMPLER_CACHE[cache_key](waveform)
 
-    # Validate minimum duration
+    # Pad clips shorter than the 1s minimum with trailing silence instead of
+    # rejecting them — percussion one-shots are frequently < 1s and are valid data.
     if waveform.shape[-1] < MIN_SAMPLES:
-        raise ValueError(
-            f"Audio too short: {waveform.shape[-1]} samples "
-            f"({waveform.shape[-1] / SAMPLE_RATE:.2f}s). Minimum is 1 second."
+        waveform = torch.nn.functional.pad(
+            waveform, (0, MIN_SAMPLES - waveform.shape[-1])
         )
 
     # Convert to stereo
